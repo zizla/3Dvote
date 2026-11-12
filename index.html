@@ -952,7 +952,13 @@ function startPresenter(){
     sel.value=v;
   }
   function fillForm(d){
-    $('#fq').value=d.q; draftOpts=d.opts.slice(); draftMode=d.mode; draftAns=d.answer; setTimeSel(d.timer); renderForm();
+    $('#fq').value=d.q||'';
+    draftOpts=(d.opts&&d.opts.length?d.opts:['','']).slice();
+    draftMode=d.mode||'poll';
+    draftAns=typeof d.answer==='number'?d.answer:-1;
+    setTimeSel(d.timer||0);
+    $('#fchg').checked=d.allowChange!==false;
+    renderForm();
   }
   Array.prototype.forEach.call(document.querySelectorAll('#fmode button'),function(b){
     b.onclick=function(){ draftMode=b.getAttribute('data-m'); renderForm(); };
@@ -1006,7 +1012,9 @@ function startPresenter(){
   $('#bReset').onclick=function(){
     if(Object.keys(st.votes).length && st.poll.status!=='closed' && !confirm('현재 문항의 투표를 지우고 초기화할까요?\n(로그와 누적 점수는 남습니다)')) return;
     var p=st.poll; st.votes={}; st.times={}; st.lastRes=null; p.id=rid(6); p.status='idle'; p.elapsed=0; p.scored=false;
-    clearBalls(); applyReveal(); log('초기화','강사',''); renderHead(); refreshTally(); publishState();
+    p.q=''; p.opts=['','']; p.mode='poll'; p.answer=-1; p.timer=0; p.allowChange=true;
+    fillForm({q:'', opts:['',''], mode:'poll', answer:-1, timer:0, allowChange:true});
+    clearBalls(); buildBars(); applyReveal(); log('초기화','강사',''); renderHead(); refreshTally(); publishState();
   };
   $('#bScore0').onclick=function(){
     if(!confirm('누적 점수와 문항별 채점 기록을 모두 지울까요?')) return;
