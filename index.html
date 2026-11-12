@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>LIVE VOTE 3D</title>
+<style>
+:root{
+  --bg:#070714; --ink:#eef0ff; --dim:#9aa0c7; --line:rgba(255,255,255,.12);
+  --glass:rgba(255,255,255,.07); --cyan:#22d3ee; --pink:#f472b6; --lime:#a3e635;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;overflow:hidden}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+[hidden]{display:none!important}
+.glass{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:16px}
+.btn{padding:10px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--line);font-weight:700;font-size:14px;transition:.15s;white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.14)}
+.btn:active{transform:scale(.96)}
+.btn.go{background:linear-gradient(135deg,#22d3ee,#6366f1);border-color:transparent;color:#04121a;box-shadow:0 0 22px rgba(34,211,238,.45)}
+.btn.warn{background:linear-gradient(135deg,#fbbf24,#fb7185);border-color:transparent;color:#1d0b05}
+.btn.ghost{color:var(--dim)}
+.chip{display:inline-grid;place-items:center;border-radius:50%;flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.18) inset}
+
+/* boot */
+#boot{position:fixed;inset:0;display:grid;place-items:center;text-align:center;padding:24px;z-index:99;background:var(--bg)}
+#boot b{font-size:22px;letter-spacing:.08em;background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+#boot p{margin-top:10px;color:var(--dim);font-size:14px;line-height:1.6}
+
+/* ───────── presenter ───────── */
+#presenter{position:fixed;inset:0}
+#stage,#labels,#bubbles,#fx{position:absolute;inset:0}
+#labels,#fx{pointer-events:none;overflow:hidden}
+#bubbles{pointer-events:none;overflow:hidden}
+.lb{position:absolute;left:0;top:0;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;will-change:transform}
+.lb.top{font-weight:900;font-size:26px;text-shadow:0 0 14px currentColor,0 2px 6px #000}
+.lb.top small{display:block;font-size:14px;font-weight:700;opacity:.9;color:#fff;text-shadow:0 1px 4px #000}
+.lb.name{max-width:220px;white-space:normal;font-weight:800;font-size:16px;padding:6px 12px;border-radius:999px;
+  background:rgba(7,7,20,.72);border:1px solid currentColor;box-shadow:0 0 14px -2px currentColor}
+.lb.name span{color:#fff}
+#top{position:absolute;left:0;right:0;top:0;display:flex;gap:12px;align-items:flex-start;padding:14px;pointer-events:none}
+#top>*{pointer-events:auto}
+#qbox{flex:1;min-width:0;padding:14px 18px}
+#qbox h1{font-size:clamp(20px,2.6vw,38px);line-height:1.25;font-weight:900;word-break:keep-all}
+#qmeta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--dim)}
+.pill{padding:4px 10px;border-radius:999px;font-weight:800;font-size:12px;letter-spacing:.06em;border:1px solid var(--line)}
+.pill.open{color:#04121a;background:var(--lime);border-color:transparent;box-shadow:0 0 16px rgba(163,230,53,.6);animation:pulse 1.4s infinite}
+.pill.paused{color:#1d0b05;background:#fbbf24;border-color:transparent}
+@keyframes pulse{50%{box-shadow:0 0 4px rgba(163,230,53,.3)}}
+#avatars{display:flex;align-items:center;flex-wrap:wrap;gap:3px}
+#avatars .chip{width:24px;height:24px;font-size:14px}
+#side{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+#mini{padding:10px;text-align:center;cursor:pointer}
+#miniQR{background:#fff;padding:6px;border-radius:10px;width:112px;height:112px}
+#miniQR img,#miniQR canvas{width:100px!important;height:100px!important;display:block}
+#mini .code{margin-top:6px;font-weight:900;letter-spacing:.2em;font-size:15px;color:var(--cyan)}
+#mini .cnt{font-size:12px;color:var(--dim);margin-top:2px}
+#mini .cnt b{color:var(--lime);font-size:16px}
+#tools{display:flex;gap:6px}
+#panel{position:absolute;left:14px;bottom:14px;width:340px;max-height:calc(100% - 190px);overflow:auto;padding:16px;z-index:5;transition:transform .3s,opacity .3s}
+#panel.off{transform:translateX(-380px);opacity:0;pointer-events:none}
+#panel h2{font-size:13px;letter-spacing:.14em;color:var(--dim);margin-bottom:10px}
+#panel label{display:block;font-size:12px;color:var(--dim);margin:12px 0 6px}
+.inp{width:100%;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid var(--line);outline:0;font-size:15px}
+.inp:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(34,211,238,.18)}
+.optrow{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.optrow i{width:10px;height:28px;border-radius:4px;flex:none}
+.optrow button{width:32px;height:38px;border-radius:8px;color:var(--dim);font-size:18px}
+.optrow button:hover{background:rgba(255,255,255,.1);color:#fff}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.row .btn{flex:1}
+.chk{display:flex!important;align-items:center;gap:8px;font-size:13px!important;color:var(--ink)!important;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--cyan)}
+.hint{font-size:11.5px;color:var(--dim);line-height:1.5;margin-top:10px}
+#net{font-size:11.5px;margin-top:10px;color:var(--dim)}
+#net.ok::before{content:"● ";color:var(--lime)} #net.bad::before{content:"● ";color:#fb7185}
+
+.bubble{position:absolute;bottom:-70px;display:flex;gap:10px;align-items:center;max-width:min(46vw,520px);padding:9px 16px 9px 9px;
+  border-radius:999px;background:rgba(16,18,44,.82);border:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  pointer-events:auto;cursor:pointer;animation:rise 11s linear forwards;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.bubble:hover{animation-play-state:paused;border-color:var(--cyan)}
+.bubble .chip{width:38px;height:38px;font-size:22px}
+.bubble .nm{font-size:12px;font-weight:800;opacity:.9}
+.bubble .tx{font-size:18px;font-weight:700;line-height:1.3;word-break:break-word}
+@keyframes rise{0%{transform:translateY(0) scale(.6);opacity:0}6%{transform:translateY(-8vh) scale(1);opacity:1}
+  80%{opacity:1}100%{transform:translateY(-88vh);opacity:0}}
+.emo{position:absolute;bottom:-50px;font-size:44px;animation:emo 2.6s ease-out forwards;will-change:transform}
+@keyframes emo{0%{transform:translate(0,0) scale(.4) rotate(0);opacity:0}12%{opacity:1;transform:translate(0,-10vh) scale(1.2)}
+  100%{transform:translate(var(--dx),-78vh) scale(.9) rotate(var(--rot));opacity:0}}
+
+.modal{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:rgba(3,3,12,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:24px}
+#qrCard{padding:28px 36px;text-align:center;max-width:92vw}
+#qrCard h3{font-size:28px;font-weight:900}
+#bigQR{background:#fff;padding:16px;border-radius:20px;display:inline-block;margin:18px 0;box-shadow:0 0 60px rgba(34,211,238,.35)}
+#bigQR img,#bigQR canvas{display:block;width:min(52vh,420px)!important;height:min(52vh,420px)!important}
+#joinUrl{font-size:14px;color:var(--cyan);word-break:break-all;user-select:all}
+#qrWarn{color:#fbbf24;font-size:13px;margin-top:10px;line-height:1.5}
+#spotCard{padding:40px 48px;max-width:min(88vw,1000px);text-align:center;border-color:var(--cyan);box-shadow:0 0 80px rgba(34,211,238,.35);animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+#spotCard .chip{width:84px;height:84px;font-size:50px;margin-bottom:12px}
+#spotCard .nm{font-size:20px;font-weight:800;color:var(--dim)}
+#spotCard .tx{font-size:clamp(30px,5vw,64px);font-weight:900;line-height:1.25;margin-top:10px;word-break:break-word}
+
+/* ───────── student ───────── */
+#student{position:fixed;inset:0;display:flex;flex-direction:column;height:100dvh;
+  background:radial-gradient(120% 60% at 50% 0%,#1a1446 0%,var(--bg) 60%)}
+#onboard{margin:auto;width:min(92vw,400px);padding:26px 22px;text-align:center}
+#onboard h1{font-size:24px;font-weight:900;letter-spacing:.04em}
+#onboard p{color:var(--dim);font-size:14px;margin-top:6px}
+#myAv{width:108px;height:108px;font-size:62px;margin:20px auto 8px;transition:.2s}
+#reroll{font-size:13px;color:var(--cyan);padding:6px 10px}
+.seg{display:flex;margin:18px 0 10px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{flex:1;padding:10px;font-size:14px;font-weight:700;color:var(--dim)}
+.seg button.on{background:rgba(34,211,238,.18);color:#fff}
+#enter{width:100%;margin-top:14px;padding:15px;font-size:17px}
+#room{display:flex;flex-direction:column;flex:1;min-height:0}
+#shead{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+#shead .chip{width:38px;height:38px;font-size:22px}
+#shead .me{flex:1;min-width:0;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sconn{font-size:12px;color:var(--dim)}
+#sconn.ok::before{content:"● ";color:var(--lime)} #sconn.bad::before{content:"● ";color:#fb7185}
+#smain{flex:1;overflow:auto;padding:18px 14px;-webkit-overflow-scrolling:touch}
+#sstat{display:inline-block;margin-bottom:10px}
+#sq{font-size:22px;font-weight:900;line-height:1.35;word-break:keep-all;margin-bottom:16px}
+#wait{text-align:center;color:var(--dim);padding:48px 12px;line-height:1.7}
+#wait .big{font-size:54px;display:block;margin-bottom:8px;animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-8px)}}
+.card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:18px 16px;margin-bottom:10px;border-radius:16px;
+  background:var(--glass);border:2px solid var(--line);font-size:18px;font-weight:800;transition:.15s;word-break:break-word}
+.card i{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-style:normal;font-size:15px;color:#05060f;flex:none}
+.card:active{transform:scale(.98)}
+.card.sel{border-color:var(--c);background:color-mix(in srgb,var(--c) 22%,transparent);box-shadow:0 0 26px -4px var(--c)}
+.card.sel::after{content:"✓";margin-left:auto;font-size:22px;color:var(--c)}
+.card.dis{opacity:.45;pointer-events:none}
+.card.sel.dis{opacity:1}
+#snote{font-size:13px;color:var(--dim);margin-top:6px;text-align:center}
+#sfoot{padding:8px 10px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(7,7,20,.7)}
+#reacts{display:flex;gap:8px;margin-bottom:8px}
+#reacts button{flex:1;font-size:26px;padding:8px 0;border-radius:14px;background:var(--glass);border:1px solid var(--line);position:relative;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#reacts button:active{transform:scale(.88);background:rgba(255,255,255,.18)}
+.pop{position:absolute;left:50%;top:0;font-size:24px;pointer-events:none;animation:popup .7s ease-out forwards}
+@keyframes popup{to{transform:translate(calc(-50% + var(--dx)),-70px) scale(1.4);opacity:0}}
+#chat{display:flex;gap:8px}
+#chat input{flex:1;font-size:16px}
+#chat .btn{padding:10px 18px}
+</style>
+</head>
+<body>
+
+<div id="boot"><div><b>LIVE VOTE 3D</b><p id="bootMsg">불러오는 중…</p></div></div>
+
+<!-- ═════════ 강사 화면 ═════════ -->
+<div id="presenter" hidden>
+  <div id="stage"></div>
+  <div id="labels"></div>
+  <div id="bubbles"></div>
+  <div id="fx"></div>
+
+  <div id="top">
+    <div id="qbox" class="glass">
+      <h1 id="qtitle">투표를 준비하세요</h1>
+      <div id="qmeta">
+        <span id="pstat" class="pill">대기</span>
+        <span>총 <b id="total">0</b>표</span>
+        <div id="avatars"></div>
+      </div>
+    </div>
+    <div id="side">
+      <div id="mini" class="glass" title="클릭하면 크게 보기">
+        <div id="miniQR"></div>
+        <div class="code" id="roomCode"></div>
+        <div class="cnt">접속 <b id="live">0</b>명</div>
+      </div>
+      <div id="tools">
+        <button class="btn" id="tPanel">⚙ 패널</button>
+        <button class="btn go" id="tSave">💾 결과 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <aside id="panel" class="glass">
+    <h2>투표 제어</h2>
+    <label>질문</label>
+    <input class="inp" id="fq" maxlength="120" placeholder="예: 오늘 점심 뭐 먹을까요?">
+    <label>선택지 (2~6개)</label>
+    <div id="fopts"></div>
+    <button class="btn ghost" id="fadd" style="width:100%">＋ 선택지 추가</button>
+    <label class="chk"><input type="checkbox" id="fchg" checked> 투표 변경(재투표) 허용</label>
+    <div class="row">
+      <button class="btn go" id="bStart">▶ 투표 시작</button>
+      <button class="btn warn" id="bPause">⏸ 일시정지</button>
+      <button class="btn" id="bReset">↺ 초기화</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="bQR">▣ QR 크게</button>
+      <button class="btn" id="bPrev">📱 학생 화면 열기</button>
+    </div>
+    <div class="row"><button class="btn ghost" id="bNew">새 방 만들기 (전체 삭제)</button></div>
+    <div id="net">연결 중…</div>
+    <p class="hint">질문·선택지를 바꾸고 ‘투표 시작’을 누르면 새 투표가 열립니다. 일시정지 후 내용을 그대로 두고 시작하면 이어서 진행됩니다. 말풍선을 클릭하면 화면 중앙에 크게 띄웁니다.</p>
+  </aside>
+
+  <div id="qrModal" class="modal" hidden>
+    <div id="qrCard" class="glass">
+      <h3>📱 QR을 찍고 참여하세요</h3>
+      <div><div id="bigQR"></div></div>
+      <div id="joinUrl"></div>
+      <div id="qrWarn" hidden></div>
+      <p class="hint">화면 아무 곳이나 누르면 닫힙니다</p>
+    </div>
+  </div>
+  <div id="spot" class="modal" hidden>
+    <div id="spotCard" class="glass"><span class="chip"></span><div class="nm"></div><div class="tx"></div></div>
+  </div>
+</div>
+
+<!-- ═════════ 학생 화면 ═════════ -->
+<div id="student" hidden>
+  <section id="onboard" class="glass">
+    <h1>LIVE VOTE 3D</h1>
+    <p>닉네임을 정하고 입장하세요</p>
+    <div id="myAv" class="chip"></div>
+    <button id="reroll">🎲 아바타·닉네임 다시 뽑기</button>
+    <div class="seg"><button id="mAnon" class="on">익명 닉네임</button><button id="mReal">실명으로 참여</button></div>
+    <input class="inp" id="nick" maxlength="12" autocomplete="off" style="text-align:center;font-weight:800">
+    <button class="btn go" id="enter">입장하기</button>
+  </section>
+
+  <section id="room" hidden>
+    <div id="shead"><span class="chip" id="sAv"></span><span class="me" id="sName"></span><span id="sconn" class="bad">연결 중</span></div>
+    <div id="smain">
+      <div id="wait"><span class="big">⏳</span>강사가 곧 질문을 엽니다.<br>그동안 아래에서 코멘트와 리액션을 보내 보세요!</div>
+      <div id="vote" hidden>
+        <span id="sstat" class="pill"></span>
+        <div id="sq"></div>
+        <div id="scards"></div>
+        <div id="snote"></div>
+      </div>
+    </div>
+    <div id="sfoot">
+      <div id="reacts"><button>🔥</button><button>👍</button><button>🎉</button><button>❓</button></div>
+      <form id="chat"><input class="inp" id="msg" maxlength="80" placeholder="코멘트 보내기…" autocomplete="off" enterkeyhint="send"><button class="btn go">전송</button></form>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ───────────────────────── 공통 ───────────────────────── */
+var $ = function(s){ return document.querySelector(s); };
+var BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://test.mosquitto.org:8081/mqtt'
+];
+var LIBS = {
+  mqtt:  'https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js',
+  three: 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  orbit: 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js',
+  qr:    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'
+};
+var COLORS = ['#22d3ee','#f472b6','#a3e635','#fbbf24','#a78bfa','#fb7185'];
+var AV_COLORS = ['#22d3ee','#f472b6','#a3e635','#fbbf24','#a78bfa','#fb7185','#34d399','#60a5fa','#f97316','#e879f9'];
+var ADJ = ['행운의','날쌘','졸린','용감한','수줍은','배고픈','씩씩한','엉뚱한','다정한','똑똑한','느긋한','반짝이는','신나는','호기심 많은','든든한','재빠른'];
+var ANI = [['코알라','🐨'],['판다','🐼'],['여우','🦊'],['고양이','🐱'],['강아지','🐶'],['토끼','🐰'],['곰','🐻'],['호랑이','🐯'],
+           ['사자','🦁'],['펭귄','🐧'],['부엉이','🦉'],['돌고래','🐬'],['문어','🐙'],['유니콘','🦄'],['개구리','🐸'],['햄스터','🐹'],
+           ['원숭이','🐵'],['고래','🐳'],['나비','🦋'],['거북이','🐢']];
+var REACTS = ['🔥','👍','🎉','❓'];
+
+var qs = new URLSearchParams(location.search);
+var ROOM_Q = (qs.get('room')||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+var IS_STUDENT = !!ROOM_Q;
+
+function rid(n){
+  var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s='', r=new Uint8Array(n);
+  (window.crypto||window.msCrypto).getRandomValues(r);
+  for(var i=0;i<n;i++) s+=a[r[i]%a.length];
+  return s;
+}
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function str(v,max){ return (typeof v==='string'? v : '').replace(/[\u0000-\u001f]/g,' ').trim().slice(0,max); }
+function load(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } }
+function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function loadScript(src){
+  return new Promise(function(res,rej){
+    var s=document.createElement('script'); s.src=src; s.onload=res;
+    s.onerror=function(){ rej(new Error('스크립트를 불러오지 못했습니다: '+src)); };
+    document.head.appendChild(s);
+  });
+}
+function setChip(el,icon,color){ el.textContent=icon; el.style.background=color; }
+function bootMsg(t){ $('#bootMsg').textContent=t; }
+function bootDone(){ $('#boot').hidden=true; }
+
+/* 브로커 순차 시도 후 연결. 성공하면 {client, bi} */
+function connectBroker(order, will){
+  return new Promise(function(res,rej){
+    var k=0;
+    (function attempt(){
+      if(k>=order.length) return rej(new Error('실시간 중계 서버에 연결하지 못했습니다. 네트워크(방화벽)를 확인해 주세요.'));
+      var bi=order[k++], done=false;
+      var opt={clientId:'lv3d_'+rid(12), clean:true, connectTimeout:7000, reconnectPeriod:0, keepalive:30};
+      if(will) opt.will=will;
+      var c=mqtt.connect(BROKERS[bi],opt);
+      c.on('error',function(){});
+      var fail=function(){ if(done) return; done=true; clearTimeout(tm); try{c.end(true);}catch(e){} attempt(); };
+      var tm=setTimeout(fail,8000);
+      c.once('close',fail);
+      c.once('connect',function(){
+        if(done) return; done=true; clearTimeout(tm);
+        c.options.reconnectPeriod=3000;
+        c.on('close',function(){
+          setTimeout(function(){ if(!c.connected && !c.reconnecting && !c.disconnecting){ try{c.reconnect();}catch(e){} } },5000);
+        });
+        res({client:c, bi:bi});
+      });
+    })();
+  });
+}
+
+/* ───────────────────────── 학생 ───────────────────────── */
+function startStudent(){
+  $('#student').hidden=false;
+  var KEY='lv3d_s_'+ROOM_Q;
+  var T='lv3d/'+ROOM_Q;
+  var me=load(KEY) || null;
+  var draft={icon:'',color:'',name:''}, real=false;
+  var client=null, poll=null, myVotes=(me&&me.votes)||{};
+
+  function roll(){
+    var a=pick(ANI);
+    draft.icon=a[1]; draft.color=pick(AV_COLORS);
+    if(!real){ draft.name=pick(ADJ)+' '+a[0]; $('#nick').value=draft.name; }
+    setChip($('#myAv'),draft.icon,draft.color);
+    $('#myAv').style.transform='scale(1.15) rotate(8deg)';
+    setTimeout(function(){ $('#myAv').style.transform=''; },180);
+  }
+  $('#reroll').onclick=roll;
+  $('#mAnon').onclick=function(){ real=false; $('#mAnon').className='on'; $('#mReal').className=''; roll(); };
+  $('#mReal').onclick=function(){ real=true; $('#mReal').className='on'; $('#mAnon').className=''; $('#nick').value=''; $('#nick').placeholder='이름을 입력하세요'; $('#nick').focus(); };
+  $('#enter').onclick=function(){
+    var n=str($('#nick').value,12);
+    if(!n){ $('#nick').focus(); return; }
+    me={id:rid(10), name:n, icon:draft.icon, color:draft.color, votes:{}};
+    myVotes=me.votes; save(KEY,me); enter();
+  };
+  $('#nick').addEventListener('keydown',function(e){ if(e.key==='Enter') $('#enter').click(); });
+
+  function ident(o){ o.id=me.id; o.name=me.name; o.icon=me.icon; o.color=me.color; return JSON.stringify(o); }
+  function send(o,qos){ if(client) client.publish(T+'/up', ident(o), {qos:qos||0}); }
+
+  function enter(){
+    $('#onboard').hidden=true; $('#room').hidden=false;
+    setChip($('#sAv'),me.icon,me.color); $('#sName').textContent=me.name;
+    var b=parseInt(qs.get('b'),10); if(!(b>=0 && b<BROKERS.length)) b=0;
+    var order=[b]; for(var i=0;i<BROKERS.length;i++) if(i!==b) order.push(i);
+    loadScript(LIBS.mqtt).then(function(){
+      return connectBroker(order,{topic:T+'/up', payload:JSON.stringify({t:'leave',id:me.id}), qos:0, retain:false});
+    }).then(function(r){
+      client=r.client;
+      var up=function(){ client.subscribe(T+'/state',{qos:1}); send({t:'hello'},1); conn(true); };
+      client.on('connect',up); client.on('close',function(){ conn(false); });
+      client.on('message',function(topic,buf){
+        if(topic!==T+'/state') return;
+        try{ poll=JSON.parse(buf.toString()); }catch(e){ return; }
+        render();
+      });
+      up();
+      setInterval(function(){ if(client.connected) send({t:'ping'}); },15000);
+    }).catch(function(e){ $('#sconn').textContent='연결 실패'; $('#wait').textContent=e.message; });
+  }
+  function conn(ok){ var el=$('#sconn'); el.className=ok?'ok':'bad'; el.textContent=ok?'LIVE':'재연결 중'; }
+
+  function render(){
+    var p=poll, active=p && (p.status==='open'||p.status==='paused') && Array.isArray(p.opts);
+    $('#wait').hidden=!!active; $('#vote').hidden=!active;
+    if(!active) return;
+    var mine=myVotes[p.id], hasVote=(typeof mine==='number');
+    var locked = p.status!=='open' || (hasVote && !p.allowChange);
+    var st=$('#sstat'); st.className='pill '+(p.status==='open'?'open':'paused'); st.textContent=p.status==='open'?'투표 중':'일시정지';
+    $('#sq').textContent=p.q||'';
+    var box=$('#scards'); box.textContent='';
+    p.opts.forEach(function(o,i){
+      var b=document.createElement('button');
+      b.className='card'+(mine===i?' sel':'')+(locked?' dis':'');
+      b.style.setProperty('--c',COLORS[i%COLORS.length]);
+      var tag=document.createElement('i'); tag.textContent=String.fromCharCode(65+i); tag.style.background=COLORS[i%COLORS.length];
+      var tx=document.createElement('span'); tx.textContent=o;
+      b.appendChild(tag); b.appendChild(tx);
+      b.onclick=function(){ vote(i); };
+      box.appendChild(b);
+    });
+    $('#snote').textContent = p.status!=='open' ? '강사가 투표를 잠시 멈췄습니다.'
+      : hasVote ? (p.allowChange ? '투표 완료! 다른 항목을 누르면 변경됩니다.' : '투표 완료! (변경 불가)')
+      : '하나를 골라 터치하세요.';
+  }
+  function vote(i){
+    if(!poll || poll.status!=='open') return;
+    var mine=myVotes[poll.id];
+    if(typeof mine==='number' && (!poll.allowChange || mine===i)) return;
+    myVotes[poll.id]=i; me.votes=myVotes; save(KEY,me);
+    send({t:'vote', poll:poll.id, opt:i},1);
+    if(navigator.vibrate) navigator.vibrate(20);
+    render();
+  }
+
+  $('#chat').addEventListener('submit',function(e){
+    e.preventDefault();
+    var v=str($('#msg').value,80); if(!v) return;
+    send({t:'chat', text:v},1); $('#msg').value='';
+  });
+
+  /* 리액션: 연타를 250ms 단위로 묶어 전송 */
+  var pend={}, timer=null;
+  Array.prototype.forEach.call(document.querySelectorAll('#reacts button'),function(b){
+    var emo=b.textContent;
+    b.addEventListener('click',function(){
+      pend[emo]=Math.min((pend[emo]||0)+1,8);
+      var s=document.createElement('span'); s.className='pop'; s.textContent=emo;
+      s.style.setProperty('--dx',(Math.random()*60-30)+'px'); b.appendChild(s);
+      setTimeout(function(){ s.remove(); },700);
+      if(!timer) timer=setTimeout(function(){
+        timer=null;
+        for(var k in pend) send({t:'react', e:k, n:pend[k]});
+        pend={};
+      },250);
+    });
+  });
+
+  bootDone();
+  if(me && me.id){ enter(); } else { roll(); }
+}
+
+/* ───────────────────────── 강사 ───────────────────────── */
+function startPresenter(){
+  var KEY='lv3d_presenter';
+  var st=load(KEY) || {};
+  if(!st.room) st.room=rid(6);
+  if(!st.poll) st.poll={id:rid(6), q:'', opts:['',''], status:'idle', allowChange:true};
+  if(!st.votes) st.votes={};      // sid → 선택지 index
+  if(!st.known) st.known={};      // sid → {name,icon,color}
+  if(!st.log) st.log=[];          // {ts,type,name,text}
+  var T='lv3d/'+st.room, client=null, bi=(typeof st.bi==='number')?st.bi:0;
+  var people={};                  // sid → {name,icon,color,last}
+  var persistT=null;
+  function persist(){ if(persistT) return; persistT=setTimeout(function(){ persistT=null; save(KEY,st); },400); }
+  function log(type,name,text){ st.log.push({ts:Date.now(),type:type,name:name,text:text}); if(st.log.length>5000) st.log.shift(); persist(); }
+
+  /* ── 3D 장면 ── */
+  var stage=$('#stage'), W=stage.clientWidth, H=stage.clientHeight;
+  var renderer=new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.setSize(W,H); renderer.outputEncoding=THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+  var scene=new THREE.Scene(); scene.background=new THREE.Color(0x070714); scene.fog=new THREE.Fog(0x070714,30,90);
+  var camera=new THREE.PerspectiveCamera(48,W/H,0.1,300);
+  var controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true; controls.dampingFactor=.08; controls.maxPolarAngle=Math.PI/2-0.03;
+  controls.minDistance=6; controls.maxDistance=70; controls.target.set(0,2.6,0);
+  scene.add(new THREE.AmbientLight(0x8890ff,.55));
+  var dl=new THREE.DirectionalLight(0xffffff,.9); dl.position.set(6,14,10); scene.add(dl);
+  var pl1=new THREE.PointLight(0x22d3ee,1.2,60); pl1.position.set(-14,9,8); scene.add(pl1);
+  var pl2=new THREE.PointLight(0xf472b6,1.2,60); pl2.position.set(14,9,-8); scene.add(pl2);
+  var grid=new THREE.GridHelper(160,80,0x3b3f8f,0x1a1c44); grid.position.y=-0.01; scene.add(grid);
+  (function stars(){
+    var g=new THREE.BufferGeometry(), n=900, p=new Float32Array(n*3);
+    for(var i=0;i<n;i++){ var r=40+Math.random()*60, a=Math.random()*Math.PI*2, y=4+Math.random()*50;
+      p[i*3]=Math.cos(a)*r; p[i*3+1]=y; p[i*3+2]=Math.sin(a)*r; }
+    g.setAttribute('position',new THREE.BufferAttribute(p,3));
+    scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xaab4ff,size:.28,transparent:true,opacity:.8,fog:false})));
+  })();
+
+  var SP=4.6, BAR_MAX=5.2, bars=[], balls={}, piles=[];
+  var barGeo=new THREE.CylinderGeometry(.72,.72,1,48), baseGeo=new THREE.CylinderGeometry(2.1,2.2,.12,64),
+      ringGeo=new THREE.RingGeometry(2.0,2.14,72), ballGeo=new THREE.SphereGeometry(.28,24,18);
+  var labels=$('#labels');
+
+  function buildBars(){
+    bars.forEach(function(b){ scene.remove(b.group); b.top.remove(); b.nm.remove(); b.mat.dispose(); b.ringMat.dispose(); });
+    bars=[]; piles=[];
+    var opts=st.poll.opts, n=opts.length;
+    for(var i=0;i<n;i++){
+      var col=new THREE.Color(COLORS[i%COLORS.length]), x=(i-(n-1)/2)*SP, g=new THREE.Group(); g.position.x=x;
+      var base=new THREE.Mesh(baseGeo,new THREE.MeshStandardMaterial({color:0x10122c,roughness:.5,metalness:.4})); base.position.y=.06; g.add(base);
+      var ringMat=new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide});
+      var ring=new THREE.Mesh(ringGeo,ringMat); ring.rotation.x=-Math.PI/2; ring.position.y=.125; g.add(ring);
+      var mat=new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.55,roughness:.25,metalness:.3,transparent:true,opacity:.92});
+      var bar=new THREE.Mesh(barGeo,mat); g.add(bar);
+      scene.add(g);
+      var top=document.createElement('div'); top.className='lb top'; top.style.color=COLORS[i%COLORS.length];
+      var nm=document.createElement('div'); nm.className='lb name'; nm.style.color=COLORS[i%COLORS.length];
+      var sp=document.createElement('span'); sp.textContent=opts[i]||('선택지 '+(i+1)); nm.appendChild(sp);
+      labels.appendChild(top); labels.appendChild(nm);
+      bars.push({group:g,bar:bar,mat:mat,ringMat:ringMat,x:x,h:.15,target:.15,top:top,nm:nm,count:-1});
+      piles.push([]);
+    }
+    camera.position.set(0, 7.5, 10+n*2.6); controls.target.set(0,2.6,0); controls.update();
+  }
+
+  var texCache={};
+  function avatarMat(icon,color){
+    var k=icon+color; if(texCache[k]) return texCache[k];
+    var c=document.createElement('canvas'); c.width=512; c.height=256;
+    var x=c.getContext('2d'); x.fillStyle=color; x.fillRect(0,0,512,256);
+    x.font='118px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; x.textAlign='center'; x.textBaseline='middle';
+    [85,256,427].forEach(function(px){ x.fillText(icon,px,134); });
+    var t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding;
+    return (texCache[k]=new THREE.MeshStandardMaterial({map:t,roughness:.35,metalness:.1,emissive:new THREE.Color(color),emissiveIntensity:.12}));
+  }
+  function slot(k){
+    var layer=Math.floor(k/22), j=k%22, r, a;
+    if(j<9){ r=1.16; a=j/9*Math.PI*2+layer*.35; } else { r=1.74; a=(j-9)/13*Math.PI*2+layer*.24; }
+    return {x:Math.cos(a)*r, z:Math.sin(a)*r, y:.4+layer*.5};
+  }
+  function retarget(opt){
+    var b=bars[opt]; if(!b) return;
+    piles[opt].forEach(function(sid,k){ var s=slot(k), m=balls[sid]; if(m){ m.tx=b.x+s.x; m.tz=s.z; m.ty=s.y; } });
+  }
+  function dropBall(sid,opt,instant){
+    var info=st.known[sid]||{icon:'🙂',color:'#888'}, m=balls[sid];
+    if(m){ var old=piles[m.opt]; if(old){ var ix=old.indexOf(sid); if(ix>=0) old.splice(ix,1); retarget(m.opt); } }
+    else { m={mesh:new THREE.Mesh(ballGeo,avatarMat(info.icon,info.color)),vy:0}; m.mesh.rotation.y=Math.random()*6.28; scene.add(m.mesh); balls[sid]=m; }
+    m.opt=opt; piles[opt].push(sid); retarget(opt);
+    m.mesh.position.set(m.tx+(Math.random()-.5)*1.2, instant? m.ty : 13+Math.random()*4, m.tz+(Math.random()-.5)*1.2); m.vy=0;
+  }
+  function clearBalls(){ for(var k in balls) scene.remove(balls[k].mesh); balls={}; piles=piles.map(function(){ return []; }); }
+
+  function counts(){
+    var c=st.poll.opts.map(function(){ return 0; });
+    for(var k in st.votes){ var v=st.votes[k]; if(v>=0 && v<c.length) c[v]++; }
+    return c;
+  }
+  function refreshTally(){
+    var c=counts(), tot=c.reduce(function(a,b){ return a+b; },0);
+    $('#total').textContent=tot;
+    bars.forEach(function(b,i){
+      b.target=.15+(tot? c[i]/tot : 0)*BAR_MAX;
+      if(b.count!==c[i] || b.tot!==tot){
+        b.count=c[i]; b.tot=tot; b.top.textContent=c[i]+'명';
+        var sm=document.createElement('small'); sm.textContent=(tot? Math.round(c[i]/tot*1000)/10 : 0)+'%'; b.top.appendChild(sm);
+      }
+    });
+  }
+
+  var v3=new THREE.Vector3();
+  function proj(x,y,z){
+    v3.set(x,y,z).project(camera);
+    return {x:(v3.x*.5+.5)*W, y:(-v3.y*.5+.5)*H, ok:v3.z<1 && v3.z>-1};
+  }
+  var clock=new THREE.Clock();
+  function frame(){
+    requestAnimationFrame(frame);
+    var dt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
+    bars.forEach(function(b,i){
+      b.h+=(b.target-b.h)*Math.min(1,dt*4);
+      b.bar.scale.y=b.h; b.bar.position.y=.12+b.h/2;
+      b.mat.emissiveIntensity=.5+.15*Math.sin(t*2+i);
+      var p=proj(b.x,b.h+1.0,0); b.top.style.display=p.ok?'':'none';
+      b.top.style.transform='translate(-50%,-50%) translate('+p.x.toFixed(1)+'px,'+p.y.toFixed(1)+'px)';
+      var q=proj(b.x,0,2.9); b.nm.style.display=q.ok?'':'none';
+      b.nm.style.transform='translate(-50%,-50%) translate('+q.x.toFixed(1)+'px,'+q.y.toFixed(1)+'px)';
+    });
+    for(var k in balls){
+      var m=balls[k], p3=m.mesh.position, f=Math.min(1,dt*5);
+      p3.x+=(m.tx-p3.x)*f; p3.z+=(m.tz-p3.z)*f;
+      if(p3.y>m.ty+.0005 || m.vy!==0){
+        m.vy-=32*dt; p3.y+=m.vy*dt;
+        if(p3.y<=m.ty){ p3.y=m.ty; m.vy = Math.abs(m.vy)>2 ? -m.vy*.32 : 0; }
+        m.mesh.rotation.y+=dt*2;
+      } else if(p3.y<m.ty){ p3.y=m.ty; }
+    }
+    controls.update(); renderer.render(scene,camera);
+  }
+  window.addEventListener('resize',function(){
+    W=stage.clientWidth; H=stage.clientHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
+  });
+
+  /* ── 상단/패널 UI ── */
+  function renderHead(){
+    var p=st.poll, s=$('#pstat');
+    $('#qtitle').textContent = p.status==='idle' ? (p.q||'투표를 준비하세요') : p.q;
+    s.className='pill '+(p.status==='open'?'open':p.status==='paused'?'paused':'');
+    s.textContent = p.status==='open'?'● LIVE 투표 중': p.status==='paused'?'일시정지':'대기';
+    $('#bStart').textContent = p.status==='paused' ? '▶ 다시 시작' : '▶ 투표 시작';
+  }
+  function renderPeople(){
+    var ids=Object.keys(people), box=$('#avatars'); $('#live').textContent=ids.length; box.textContent='';
+    ids.slice(0,28).forEach(function(id){ var c=document.createElement('span'); c.className='chip'; c.title=people[id].name; setChip(c,people[id].icon,people[id].color); box.appendChild(c); });
+    if(ids.length>28){ var more=document.createElement('span'); more.textContent='+'+(ids.length-28); more.style.marginLeft='4px'; box.appendChild(more); }
+  }
+  var draftOpts=st.poll.opts.slice();
+  function renderOpts(){
+    var box=$('#fopts'); box.textContent='';
+    draftOpts.forEach(function(o,i){
+      var r=document.createElement('div'); r.className='optrow';
+      var sw=document.createElement('i'); sw.style.background=COLORS[i%COLORS.length];
+      var inp=document.createElement('input'); inp.className='inp'; inp.maxLength=40; inp.value=o; inp.placeholder='선택지 '+(i+1);
+      inp.oninput=function(){ draftOpts[i]=inp.value; };
+      var del=document.createElement('button'); del.textContent='×'; del.title='삭제';
+      del.style.visibility=draftOpts.length>2?'visible':'hidden';
+      del.onclick=function(){ draftOpts.splice(i,1); renderOpts(); };
+      r.appendChild(sw); r.appendChild(inp); r.appendChild(del); box.appendChild(r);
+    });
+    $('#fadd').hidden=draftOpts.length>=6;
+  }
+  $('#fq').value=st.poll.q; $('#fchg').checked=st.poll.allowChange!==false;
+  $('#fadd').onclick=function(){ if(draftOpts.length<6){ draftOpts.push(''); renderOpts(); } };
+
+  function publishState(){
+    var p=st.poll;
+    if(client) client.publish(T+'/state', JSON.stringify({id:p.id,q:p.q,opts:p.opts,status:p.status,allowChange:p.allowChange}), {qos:1,retain:true});
+    persist();
+  }
+  function cleanDraft(){
+    return draftOpts.map(function(o,i){ return str(o,40)||('선택지 '+(i+1)); });
+  }
+  $('#bStart').onclick=function(){
+    var q=str($('#fq').value,120), opts=cleanDraft(), p=st.poll;
+    if(!q){ $('#fq').focus(); return; }
+    var same = p.q===q && p.opts.length===opts.length && p.opts.every(function(o,i){ return o===opts[i]; });
+    p.allowChange=$('#fchg').checked;
+    if(p.status==='paused' && same){ p.status='open'; }
+    else if(p.status==='open' && same){ /* 설정만 갱신 */ }
+    else {
+      st.poll={id:rid(6), q:q, opts:opts, status:'open', allowChange:$('#fchg').checked};
+      st.votes={}; clearBalls(); buildBars(); log('투표 시작','강사',q+' ['+opts.join(' / ')+']');
+    }
+    renderHead(); refreshTally(); publishState();
+    if(window.innerWidth<1100) $('#panel').classList.add('off');
+  };
+  $('#bPause').onclick=function(){ if(st.poll.status==='open'){ st.poll.status='paused'; log('일시정지','강사',''); renderHead(); publishState(); } };
+  $('#bReset').onclick=function(){
+    if(Object.keys(st.votes).length && !confirm('현재 투표 결과를 지우고 초기화할까요?\n(코멘트·투표 로그는 결과 저장용으로 남습니다)')) return;
+    st.votes={}; st.poll.id=rid(6); st.poll.status='idle'; clearBalls(); log('초기화','강사','');
+    renderHead(); refreshTally(); publishState();
+  };
+  $('#bNew').onclick=function(){
+    if(!confirm('새 방을 만들면 현재 방의 결과와 로그가 모두 삭제되고 QR이 바뀝니다. 계속할까요?')) return;
+    if(client) client.publish(T+'/state','',{retain:true,qos:1});
+    try{ localStorage.removeItem(KEY); }catch(e){}
+    setTimeout(function(){ location.reload(); },400);
+  };
+  $('#tPanel').onclick=function(){ $('#panel').classList.toggle('off'); };
+
+  /* ── QR ── */
+  var joinUrl='';
+  function buildQR(){
+    joinUrl=location.href.split('#')[0].split('?')[0]+'?room='+st.room+'&b='+bi;
+    $('#roomCode').textContent=st.room; $('#joinUrl').textContent=joinUrl;
+    ['#miniQR','#bigQR'].forEach(function(sel,i){
+      var el=$(sel); el.textContent='';
+      new QRCode(el,{text:joinUrl,width:i?640:200,height:i?640:200,correctLevel:QRCode.CorrectLevel.M});
+    });
+    var w=$('#qrWarn'), h=location.hostname;
+    if(location.protocol==='file:'){ w.hidden=false; w.textContent='⚠ 지금은 파일로 직접 연 상태라 스마트폰에서 접속할 수 없습니다. GitHub Pages 등에 올린 주소로 열어 주세요.'; }
+    else if(h==='localhost'||h==='127.0.0.1'){ w.hidden=false; w.textContent='⚠ localhost 주소는 이 PC에서만 열립니다. PC의 내부 IP 또는 배포 주소로 접속해 주세요.'; }
+    else w.hidden=true;
+  }
+  function showQR(){ $('#qrModal').hidden=false; }
+  $('#mini').onclick=showQR; $('#bQR').onclick=showQR;
+  $('#qrModal').onclick=function(e){ if(e.target.id!=='joinUrl') $('#qrModal').hidden=true; };
+  $('#bPrev').onclick=function(){ window.open(joinUrl,'_blank'); };
+
+  /* ── 말풍선 / 리액션 ── */
+  var bub=$('#bubbles'), fx=$('#fx');
+  function bubble(info,text){
+    if(bub.childElementCount>40) bub.firstChild.remove();
+    var b=document.createElement('div'); b.className='bubble'; b.style.left=(3+Math.random()*62)+'%';
+    var c=document.createElement('span'); c.className='chip'; setChip(c,info.icon,info.color);
+    var w=document.createElement('div'), n=document.createElement('div'), x=document.createElement('div');
+    n.className='nm'; n.textContent=info.name; n.style.color=info.color; x.className='tx'; x.textContent=text;
+    w.appendChild(n); w.appendChild(x); b.appendChild(c); b.appendChild(w);
+    b.onclick=function(){ spotlight(info,text); };
+    b.addEventListener('animationend',function(){ b.remove(); });
+    bub.appendChild(b);
+  }
+  function spotlight(info,text){
+    var card=$('#spotCard'); setChip(card.querySelector('.chip'),info.icon,info.color);
+    card.querySelector('.nm').textContent=info.name; card.querySelector('.tx').textContent=text;
+    $('#spot').hidden=false;
+  }
+  $('#spot').onclick=function(){ $('#spot').hidden=true; };
+  function burst(e,n){
+    for(var i=0;i<n;i++){
+      if(fx.childElementCount>160) return;
+      (function(d){
+        setTimeout(function(){
+          var s=document.createElement('span'); s.className='emo'; s.textContent=e;
+          s.style.left=(4+Math.random()*90)+'%'; s.style.fontSize=(34+Math.random()*30)+'px';
+          s.style.setProperty('--dx',(Math.random()*160-80)+'px'); s.style.setProperty('--rot',(Math.random()*80-40)+'deg');
+          s.addEventListener('animationend',function(){ s.remove(); });
+          fx.appendChild(s);
+        },d);
+      })(i*70);
+    }
+  }
+
+  /* ── 수신 처리 ── */
+  function onUp(buf){
+    var m; try{ m=JSON.parse(buf.toString()); }catch(e){ return; }
+    if(!m || typeof m!=='object') return;
+    var id=str(m.id,16); if(!id) return;
+    if(m.t==='leave'){ if(people[id]){ delete people[id]; renderPeople(); } return; }
+    var info={name:str(m.name,12)||'익명', icon:str(m.icon,8)||'🙂', color:/^#[0-9a-fA-F]{6}$/.test(m.color)?m.color:'#888888'};
+    var isNew=!people[id];
+    people[id]={name:info.name,icon:info.icon,color:info.color,last:Date.now()};
+    st.known[id]=info;
+    if(isNew){ renderPeople(); if(m.t==='hello') log('입장',info.name,''); }
+    if(m.t==='vote'){
+      var p=st.poll, o=m.opt;
+      if(p.status!=='open' || m.poll!==p.id || typeof o!=='number' || o<0 || o>=p.opts.length || o%1) return;
+      var prev=st.votes[id];
+      if(typeof prev==='number'){ if(!p.allowChange || prev===o) return; log('투표 변경',info.name,p.opts[prev]+' → '+p.opts[o]); }
+      else log('투표',info.name,p.opts[o]);
+      st.votes[id]=o; dropBall(id,o,false); refreshTally(); persist();
+    } else if(m.t==='chat'){
+      var tx=str(m.text,80); if(!tx) return;
+      bubble(info,tx); log('코멘트',info.name,tx);
+    } else if(m.t==='react'){
+      if(REACTS.indexOf(m.e)<0) return;
+      burst(m.e, Math.max(1,Math.min(8,m.n|0)));
+    }
+  }
+  setInterval(function(){
+    var now=Date.now(), ch=false;
+    for(var k in people) if(now-people[k].last>45000){ delete people[k]; ch=true; }
+    if(ch) renderPeople();
+  },5000);
+
+  /* ── 결과 저장 ── */
+  function dl(blob,name){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  }
+  function csvCell(v){ v=String(v==null?'':v); if(/^[=+\-@]/.test(v)) v="'"+v; return '"'+v.replace(/"/g,'""')+'"'; }
+  function fmt(ts){ var d=new Date(ts), z=function(n){ return (n<10?'0':'')+n; };
+    return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds()); }
+  $('#tSave').onclick=function(){
+    var p=st.poll, c=counts(), tot=c.reduce(function(a,b){ return a+b; },0), rows=[];
+    var stamp=fmt(Date.now()), fn='livevote_'+st.room+'_'+stamp.replace(/[-: ]/g,'').slice(0,14);
+    rows.push(['질문',p.q]); rows.push(['저장 시각',stamp]); rows.push(['방 코드',st.room]);
+    rows.push(['총 투표수',tot]); rows.push(['현재 접속자 수',Object.keys(people).length]); rows.push([]);
+    rows.push(['선택지','득표수','득표율(%)']);
+    p.opts.forEach(function(o,i){ rows.push([o,c[i],tot? (c[i]/tot*100).toFixed(1):'0.0']); });
+    rows.push([]); rows.push(['현재 투표 현황 (참여자별)']); rows.push(['닉네임','선택']);
+    for(var sid in st.votes) rows.push([(st.known[sid]||{}).name||sid, p.opts[st.votes[sid]]||'']);
+    rows.push([]); rows.push(['시간대별 로그']); rows.push(['시각','유형','닉네임','내용']);
+    st.log.forEach(function(l){ rows.push([fmt(l.ts),l.type,l.name,l.text]); });
+    var csv=rows.map(function(r){ return r.map(csvCell).join(','); }).join('\r\n');
+    dl(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}), fn+'.csv');
+
+    /* 3D 스냅샷 + 라벨 합성 */
+    renderer.render(scene,camera);
+    var src=renderer.domElement, cv=document.createElement('canvas'); cv.width=src.width; cv.height=src.height;
+    var x=cv.getContext('2d'), k=src.width/W; x.drawImage(src,0,0);
+    var FF='"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif';
+    x.textAlign='center'; x.textBaseline='middle'; x.shadowColor='#000'; x.shadowBlur=8*k;
+    bars.forEach(function(b,i){
+      var a=proj(b.x,b.h+1.0,0), q=proj(b.x,0,2.9), col=COLORS[i%COLORS.length];
+      if(a.ok){ x.fillStyle=col; x.font='900 '+(26*k)+'px '+FF; x.fillText(c[i]+'명',a.x*k,a.y*k-10*k);
+        x.fillStyle='#fff'; x.font='700 '+(15*k)+'px '+FF; x.fillText((tot? (c[i]/tot*100).toFixed(1):'0.0')+'%',a.x*k,a.y*k+14*k); }
+      if(q.ok){ x.fillStyle='#fff'; x.font='800 '+(16*k)+'px '+FF; x.fillText(p.opts[i],q.x*k,q.y*k); }
+    });
+    x.textAlign='left'; x.fillStyle='#fff'; x.font='900 '+(30*k)+'px '+FF; x.fillText(p.q||'',24*k,40*k,cv.width-48*k);
+    x.fillStyle='#9aa0c7'; x.font='600 '+(14*k)+'px '+FF; x.fillText('총 '+tot+'표 · '+stamp,24*k,74*k);
+    setTimeout(function(){ cv.toBlob(function(bl){ if(bl) dl(bl,fn+'.png'); },'image/png'); },350);
+  };
+
+  /* ── 시작 ── */
+  $('#presenter').hidden=false;
+  W=stage.clientWidth; H=stage.clientHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
+  buildBars(); renderOpts(); renderHead();
+  for(var sid in st.votes){ if(st.votes[sid]<st.poll.opts.length) dropBall(sid,st.votes[sid],true); }
+  refreshTally(); renderPeople(); frame(); bootDone();
+
+  var order=[bi]; for(var i=0;i<BROKERS.length;i++) if(i!==bi) order.push(i);
+  var net=$('#net');
+  connectBroker(order,null).then(function(r){
+    client=r.client; bi=r.bi; st.bi=bi; persist(); buildQR();
+    var up=function(){ client.subscribe(T+'/up',{qos:1}); publishState(); net.className='ok'; net.textContent='실시간 연결됨 · '+BROKERS[bi].split('/')[2]; };
+    client.on('connect',up);
+    client.on('close',function(){ net.className='bad'; net.textContent='연결 끊김 · 재연결 중…'; });
+    client.on('message',function(topic,buf){ if(topic===T+'/up') onUp(buf); });
+    up();
+    if(!Object.keys(st.votes).length && st.poll.status==='idle') showQR();
+  }).catch(function(e){ net.className='bad'; net.textContent=e.message; buildQR(); });
+}
+
+/* ───────────────────────── 부트 ───────────────────────── */
+if(IS_STUDENT){ startStudent(); }
+else {
+  bootMsg('3D 엔진을 불러오는 중…');
+  loadScript(LIBS.three).then(function(){ return Promise.all([loadScript(LIBS.orbit),loadScript(LIBS.qr),loadScript(LIBS.mqtt)]); })
+    .then(startPresenter)
+    .catch(function(e){ bootMsg(e.message+' — 인터넷 연결을 확인한 뒤 새로고침해 주세요.'); });
+}
+})();
+</script>
+</body>
+</html>
